@@ -14,15 +14,26 @@ class SQLObject < MassObject
   end
 
   def self.table_name=(table_name)
-    # ...
+    unless table_name.nil?
+      @table_name = table_name
+    end
   end
 
   def self.table_name
-    # ...
+    if !!@table_name
+      return @table_name
+    else
+      @table_name = self.to_s.underscore.pluralize
+    end
   end
 
   def self.all
-    # ...
+    # self.find_by_sql([<<-SQL, self.table_name])
+    # SELECT
+    #   *
+    # FROM
+    #   ?
+    # SQL
   end
 
   def self.find(id)
@@ -30,7 +41,7 @@ class SQLObject < MassObject
   end
 
   def attributes
-    # ...
+    # @attributes ||=
   end
 
   def insert
