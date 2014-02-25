@@ -4,13 +4,24 @@ require 'active_support/inflector'
 
 class MassObject
   def self.parse_all(results)
-    # ...
+    all = []
+    results.each do |result|
+      p result
+      p '************'
+      all << self.new(result)
+    end
+    all
   end
 end
 
 class SQLObject < MassObject
   def self.columns
-    # ...
+    columns = DBConnection.execute2("SELECT * FROM #{self.table_name}").first
+    columns.each do |col_name|
+      define_method("#{col_name.to_sym}=") { |val| attributes[col_name] = val }
+      define_method("#{col_name.to_sym}") { return attributes[col_name] }
+    end
+    return columns
   end
 
   def self.table_name=(table_name)
@@ -28,12 +39,17 @@ class SQLObject < MassObject
   end
 
   def self.all
-    # self.find_by_sql([<<-SQL, self.table_name])
-    # SELECT
-    #   *
-    # FROM
-    #   ?
-    # SQL
+    results = []
+    object_arr = DBConnection.execute(<<-SQL)
+    SELECT
+      *
+    FROM
+      #{self.table_name}
+    SQL
+    object_arr.each do |object_hash|
+      results << object_hash
+    end
+    self.parse_all(results)
   end
 
   def self.find(id)
@@ -41,15 +57,27 @@ class SQLObject < MassObject
   end
 
   def attributes
-    # @attributes ||=
+    @attributes ||= Hash.new
   end
 
   def insert
     # ...
   end
 
-  def initialize
-    # ...
+  def initialize(params)
+    attributes
+    columns = self.class.columns
+    params.each do |attr_name, value|
+      p "-------------------"
+      p attr_name
+      p columns
+      p '====================='
+      if columns.include?(attr_name)
+        @attributes[attr_name.to_sym] = value
+      else
+        raise "unknown attribute #{attr_name}"
+      end
+    end
   end
 
   def save
