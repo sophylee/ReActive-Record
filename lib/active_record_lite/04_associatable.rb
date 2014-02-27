@@ -49,12 +49,6 @@ module Associatable
     @options
   end
 
-  # def assoc_options=(options)
-  #   # unless options.nil?
-  #     @options = options
-  #   # end
-  # end
-
   def belongs_to(name, options = {})
     name_sym = name.to_sym
     assoc_options[name_sym] = BelongsToOptions.new(name, options)
