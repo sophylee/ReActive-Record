@@ -6,8 +6,6 @@ class MassObject
   def self.parse_all(results)
     all = []
     results.each do |result|
-      p result
-      p '************'
       all << self.new(result)
     end
     all
@@ -16,11 +14,13 @@ end
 
 class SQLObject < MassObject
   def self.columns
-    columns = DBConnection.execute2("SELECT * FROM #{self.table_name}").first
-    columns.each do |col_name|
-      define_method("#{col_name.to_sym}=") { |val| attributes[col_name] = val }
-      define_method("#{col_name.to_sym}") { return attributes[col_name] }
-    end
+    query = "SELECT * FROM #{self.table_name}"
+    columns = DBConnection.execute2(query).first.map(&:to_sym)
+
+    columns.each do |column|
+      define_method("#{column}=") { |val| attributes[column] = val }
+      define_method("#{column}") { attributes[column] }
+      end
     return columns
   end
 
@@ -44,7 +44,7 @@ class SQLObject < MassObject
     SELECT
       *
     FROM
-      #{self.table_name}
+      #{self.table_name};
     SQL
     object_arr.each do |object_hash|
       results << object_hash
@@ -53,7 +53,17 @@ class SQLObject < MassObject
   end
 
   def self.find(id)
-    # ...
+    object = DBConnection.execute(<<-SQL, id)
+        SELECT
+          *
+        FROM
+          #{self.table_name}
+        WHERE
+          id = ?;
+          SQL
+    # object.first returns params for an object.
+    # The line below builds an object using those params.
+    new_obj = self.new(object.first)
   end
 
   def attributes
@@ -61,34 +71,61 @@ class SQLObject < MassObject
   end
 
   def insert
-    # ...
+    table = self.class.table_name
+    value_count = self.attributes.keys.count
+    col_names = self.attributes.keys.join(", ")
+    values = self.attribute_values
+    question_marks = (["?"] * value_count).join(", ")
+    DBConnection.execute(<<-SQL, *values)
+    INSERT INTO
+      #{table} (#{col_names})
+    VALUES
+      (#{question_marks});
+    SQL
+    self.id = DBConnection.last_insert_row_id
   end
 
-  def initialize(params)
+  def initialize(*params)
     attributes
     columns = self.class.columns
-    params.each do |attr_name, value|
-      p "-------------------"
-      p attr_name
-      p columns
-      p '====================='
-      if columns.include?(attr_name)
-        @attributes[attr_name.to_sym] = value
-      else
-        raise "unknown attribute #{attr_name}"
+    unless params.empty?
+      params.first.each do |attr_name, value|
+        if columns.include?(attr_name.to_sym)
+          @attributes[attr_name.to_sym] = value
+        else
+          raise "unknown attribute #{attr_name}"
+        end
       end
     end
   end
 
   def save
-    # ...
+    if self.id.nil?
+      self.insert
+    else
+      self.update
+    end
   end
 
   def update
-    # ...
+    table = self.class.table_name
+    values = attribute_values
+    set_line = self.attributes.keys.map { |col| "#{col} = ?" }.join(", ")
+    DBConnection.execute(<<-SQL, *values, self.id)
+    UPDATE
+      #{table}
+    SET
+      #{set_line}
+    WHERE
+      id = ?;
+    SQL
   end
 
   def attribute_values
-    # ...
+    values = []
+    @attributes.each do |attr_name, value|
+      values << value
+    end
+    values
   end
 end
